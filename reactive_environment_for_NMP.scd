@@ -37,8 +37,8 @@ q.createGUI_start = { |q|
 	var flag5=true;
 	var flag6=true;
 	var next_flag;
-	var dvm_box,esp_box;
-	var musician_label, features_question, dvm_label, esp_label;
+	var dvm_box,esp_box, rms_box;
+	var musician_label, features_question, dvm_label, esp_label, rms_label;
 
 	q.x_ratio = 1; 
 	q.y_ratio = 1;
@@ -46,6 +46,7 @@ q.createGUI_start = { |q|
 	q.y_total = Window.availableBounds.bottom;
 	q.dvm=true;
 	q.esp=true;
+	q.rms=true;
 	q.num=3;
 	q.cond_string="";
 
@@ -65,9 +66,8 @@ q.createGUI_start = { |q|
 	
 
 	//open up port 10 ports starting with 57120, this is where we send everything to
-	10.do({arg i;	
-		thisProcess.openUDPPort(57120+i);
-	});
+	thisProcess.openUDPPort(57120);
+	thisProcess.openUDPPort(57121);
 	
 	ip_text=Array.newClear(q.num-1);
 	musician_label=Array.newClear(q.num-1);
@@ -258,6 +258,34 @@ q.createGUI_start = { |q|
 	esp_label.string = "Enhanced Stereo Panning"; 	
 	esp_label.font = Font("Calibri",font_size);
 	esp_label.stringColor=Color.gray(0.4);
+
+
+
+	x_pos = ((q.x_available-(400*q.x_ratio))/2).asInteger;
+	y_pos = (575*q.y_ratio).asInteger;
+	x_size = (30*q.y_ratio).asInteger;
+	y_size = (30*q.x_ratio).asInteger;	
+	rms_box = CheckBox(s, Rect(x_pos,y_pos,x_size,y_size));
+	rms_box.value = 1;
+	rms_box.action = {arg value;
+		if (value == 1,{
+			q.rms = true;
+		},{
+			q.rms = false;
+		});	
+	};
+
+	x_pos =  ((q.x_available-(400*q.x_ratio))/2+30).asInteger;
+	y_pos = (575*q.y_ratio).asInteger;
+	x_size = ((400-25)*q.y_ratio).asInteger;	
+	y_size = (30*q.x_ratio).asInteger;
+	font_size = (20*q.min_effective_ratio).asInteger;
+	rms_label = StaticText(s, Rect(x_pos,y_pos,x_size,y_size));
+	rms_label.string = "Remote Musician Spatialization"; 	
+	rms_label.font = Font("Calibri",font_size);
+	rms_label.stringColor=Color.gray(0.4);
+
+
 
 
 	x_pos = (q.x_available-(((250+25)*q.x_ratio))).asInteger;
@@ -1038,6 +1066,10 @@ q.startjam = { |q|
 	var player_positions_rotated=Array2D.new(q.num,2);
 	var player_positions_translated_for_GUI=Array2D.new(q.num,2);
 	var player_positions_rotated_for_GUI=Array2D.new(q.num,2);
+	var player_positions_rotated_perspective=Array2D.new(q.num,2);
+	var player_positions_translated_viewer=Array2D.new(q.num,2);
+	var player_positions_scaled=Array2D.new(q.num,2);
+	var player_positions_viewer=Array2D.new(q.num,2);
 	var player_received, info_received;
 	var distance = Array.newClear(q.num);
 	//these are to be used if video is on
@@ -1045,19 +1077,22 @@ q.startjam = { |q|
 	var monitor_position = Array2D.new(q.num,q.num);
 
 	//we define all variables related to esp
-	var angles = Array.newClear(q.num);
+	var esp_angle = 0;
+	var rms_angle = 0;
 	var head_roll = Array.newClear(q.num);
+	var head_yaw = Array.newClear(q.num);
 	var body_yaw = Array.newClear(q.num);
-	var esp_right = Array.newClear(q.num);
-	var esp_left = Array.newClear(q.num);
+	var volume_left = Array.newClear(q.num);
+	var volume_right = Array.newClear(q.num);
 	var right_to_left=[0,0];	
-	var angle_thresh=5*pi/180;
-	//var angle_thresh=0;
-	var adjusted_angle=0;
+	var esp_angle_thresh=5*pi/180;
+	var esp_adjusted_angle=0;
 	var esp_direction=0;
+	var pan_pos=0;
 
 	var filter_size=20;
 	var filter_head_roll=Array2D.new(q.num,filter_size);
+	var filter_head_yaw=Array2D.new(q.num,filter_size);
 	var filter_body_yaw=Array2D.new(q.num,filter_size);
 	var filter_x_pos = Array2D.new(q.num,filter_size);
 	var filter_y_pos = Array2D.new(q.num,filter_size);
@@ -1109,6 +1144,7 @@ q.startjam = { |q|
 		volume[i]=base[i];
 		max_volume[i]=volume[i]+loudness_range;
 		head_roll[i]=0;
+		head_yaw[i]=0;
 		body_yaw[i]=0;
 		//we want all avatars off the viewer until they start sending messages
 		player_positions[i,0]=q.kinect_corners_actual[i,1][0];
@@ -1123,10 +1159,20 @@ q.startjam = { |q|
 		player_positions_rotated[i,1]=q.kinect_corners_rotated[i,1][1];
 		player_positions_rotated_for_GUI[i,0]=q.kinect_corners_rotated[i,1][0];
 		player_positions_rotated_for_GUI[i,1]=q.kinect_corners_rotated[i,1][1];
+		//initialize player_positions_viewer in case we are not receiving messages from other players yet
+		player_positions_rotated_perspective[i,0]=(q.rotation_matrix[q.player_num][0,0]*player_positions_rotated_for_GUI[i,0])+(q.rotation_matrix[q.player_num][0,1]*player_positions_rotated_for_GUI[i,1]);
+		player_positions_rotated_perspective[i,1]=(q.rotation_matrix[q.player_num][1,0]*player_positions_rotated_for_GUI[i,0])+(q.rotation_matrix[q.player_num][1,1]*player_positions_rotated_for_GUI[i,1]); 
+		player_positions_translated_viewer[i,0]=player_positions_rotated_perspective[i,0]-q.min_x;
+		player_positions_translated_viewer[i,1]=player_positions_rotated_perspective[i,1]-q.min_y;
+		
+		player_positions_scaled[i,0] = player_positions_translated_viewer[i,0]*q.pos_viewer_ratio_x;
+		player_positions_scaled[i,1] = player_positions_translated_viewer[i,1]*q.pos_viewer_ratio_y; 
+		player_positions_viewer[i,0] = player_positions_scaled[i,0]+q.avatar_margin;
+		player_positions_viewer[i,1] = q.viewer_total_height-player_positions_scaled[i,1]-q.avatar_margin;
+
 		in_channels[i]=i;
-		esp_right[i]=0;
-		esp_left[i]=0;
-		angles[i]=0;
+		volume_right[i]=0;
+		volume_left[i]=0;
 		q.num.do({arg j;
 			distance_to_monitors[i,j]=0;
 		});
@@ -1138,6 +1184,7 @@ q.startjam = { |q|
 	q.num.do({arg i;
 		filter_size.do({arg j;
 			filter_head_roll[i,j]=0;
+			filter_head_yaw[i,j]=0;
 			filter_body_yaw[i,j]=0;
 			filter_x_pos[i,j]=q.kinect_corners_actual[i,1][0];
 			filter_y_pos[i,j]=q.kinect_corners_actual[i,1][1];
@@ -1150,7 +1197,7 @@ q.startjam = { |q|
 
 	t=Task.new({
 		if(q.num==4, {
-			SynthDef(\player_mix,{ |amp=#[0,0,0,0], channel_out|	 
+			SynthDef(\player_mix,{ |amp=#[0,0,0,0], channel_out, angle|	 
 				var source=Array.newClear(q.num);
 				var source_total;								
 				(q.num).do({arg i;
@@ -1158,9 +1205,9 @@ q.startjam = { |q|
 				});		
 				source_total=source.sum/q.num;				
 				Out.ar(channel_out,source_total);
-				}).add;	
+			}).add;	
 		},{
-			SynthDef(\player_mix,{ |amp=#[0,0,0], channel_out|	 
+			SynthDef(\player_mix,{ |amp=#[0,0,0], channel_out, angle|	 
 				var source=Array.newClear(q.num);
 				var source_total;								
 				(q.num).do({arg i;
@@ -1168,14 +1215,14 @@ q.startjam = { |q|
 				});		
 				source_total=source.sum/q.num;				
 				Out.ar(channel_out,source_total);
-				}).add;
+			}).add;
 		});
 
 		l.sync;
 	
 		//we initialize our local player synth
-		q.player_out_right = Synth(\player_mix, [\amp, volume,\channel_out, out_channels[0]]);
-		q.player_out_left = Synth(\player_mix, [\amp, volume,\channel_out, out_channels[1]]);	
+		q.player_out_right = Synth(\player_mix, [\amp, volume,\channel_out, out_channels[0],\angle, 0]);
+		q.player_out_left = Synth(\player_mix, [\amp, volume,\channel_out, out_channels[1],\angle, 0]);	
 		"we've initialized our synth now".postln;
 
 		//we want to inquire about other musicians' volumes when we start the jam
@@ -1246,6 +1293,7 @@ q.startjam = { |q|
 				max_volume[i]=base[i]+loudness_range;
 			});
 		});	
+		base.postln;
 		q.player_out_right.set(\amp, base);
 		q.player_out_left.set(\amp, base);
 	}).add;	
@@ -1273,7 +1321,6 @@ q.startjam = { |q|
 	//Note that we receive the messages for all three players
 	q.info_osc = OSCresponderNode(nil, '/client', {arg time, resp, msg;			
 		var player_received;
-		msg.postln;
 
 		if (msg[2]==(-1),{
 			//this means it is coming from the local computer	
@@ -1284,6 +1331,7 @@ q.startjam = { |q|
 
 			
 		if(msg[1].asString=="head",{
+			filter_head_yaw[player_received, counter%filter_size]=msg[7]*pi/180;
 			filter_head_roll[player_received, counter%filter_size]=msg[8]*pi/180;		
 		});
 
@@ -1317,11 +1365,19 @@ q.startjam = { |q|
 			filter_y_pos[player_received, counter%filter_size]=temp_y;
 
 			filter_body_yaw[player_received, counter%filter_size]=msg[7]*pi/180;
-
+					
+			head_roll[player_received]=((filter_head_roll.rowAt(player_received).sum)/filter_size);
+			head_yaw[player_received]=((filter_head_yaw.rowAt(player_received).sum)/filter_size);
+			body_yaw[player_received]=((filter_body_yaw.rowAt(player_received).sum)/filter_size);
+	
+			//rms_angle=((-1)*(head_yaw[player_received]-body_yaw[player_received]));
+			rms_angle=(-1)*(head_yaw[player_received]);
+			esp_angle=(-1)*(head_roll[player_received]);
 
 			player_positions[player_received,0]=((filter_x_pos.rowAt(player_received).sum)/filter_size);
 			player_positions[player_received,1]=((filter_y_pos.rowAt(player_received).sum)/filter_size);
 
+			counter=counter+1;
 			
 			player_positions_adjusted_kinect_location[player_received,0]=player_positions[player_received,0];
 			player_positions_adjusted_kinect_location[player_received,1]=(q.kinect_min_y[player_received]+q.kinect_max_y[player_received])-player_positions[player_received,1];
@@ -1342,15 +1398,24 @@ q.startjam = { |q|
 			player_positions_rotated_for_GUI[player_received,0]=(q.rotation_matrix[player_received][0,0]*player_positions_translated_for_GUI[player_received,0])+(q.rotation_matrix[player_received][0,1]*player_positions_translated_for_GUI[player_received,1]);
 			player_positions_rotated_for_GUI[player_received,1]=(q.rotation_matrix[player_received][1,0]*player_positions_translated_for_GUI[player_received,0])+(q.rotation_matrix[player_received][1,1]*player_positions_translated_for_GUI[player_received,1]);
 
-			head_roll[player_received]=((filter_head_roll.rowAt(player_received).sum)/filter_size);
-			body_yaw[player_received]=((filter_body_yaw.rowAt(player_received).sum)/filter_size);
-	
-			angles[player_received]=((-1)*head_roll[player_received]);
-			//(angles[q.player_num]*180/pi).postln;
-			counter=counter+1;
-		
+
+
+			//we need to make the adjustments based on the current player's perspective
+			player_positions_rotated_perspective[player_received,0]=(q.rotation_matrix[q.player_num][0,0]*player_positions_rotated_for_GUI[player_received,0])+(q.rotation_matrix[q.player_num][0,1]*player_positions_rotated_for_GUI[player_received,1]);
+			player_positions_rotated_perspective[player_received,1]=(q.rotation_matrix[q.player_num][1,0]*player_positions_rotated_for_GUI[player_received,0])+(q.rotation_matrix[q.player_num][1,1]*player_positions_rotated_for_GUI[player_received,1]); 
+
 			
+
+			//positions have already been rotated and are in the appropriate quadrant
+			//we still need to translate, then scale them so that they can be seen by our viewer
+			player_positions_translated_viewer[player_received,0]=player_positions_rotated_perspective[player_received,0]-q.min_x;
+			player_positions_translated_viewer[player_received,1]=player_positions_rotated_perspective[player_received,1]-q.min_y;
 		
+			player_positions_scaled[player_received,0] = player_positions_translated_viewer[player_received,0]*q.pos_viewer_ratio_x;
+			player_positions_scaled[player_received,1] = player_positions_translated_viewer[player_received,1]*q.pos_viewer_ratio_y; 
+			player_positions_viewer[player_received,0] = player_positions_scaled[player_received,0]+q.avatar_margin;
+			player_positions_viewer[player_received,1] = q.viewer_total_height-player_positions_scaled[player_received,1]-q.avatar_margin;
+
 	
 			if(player_received==q.player_num,{
 				//now we resend this message to both remote participants if we've received our own info			
@@ -1363,70 +1428,113 @@ q.startjam = { |q|
 
 
 				//now we need to calculate the distances to each monitor
-				q.num.do({arg i;
-					q.num.do({arg j;
-						if(i!=j,{
-							distance_to_monitors[i,j]=(player_positions_rotated.rowAt(i)-monitor_position[i,j]).squared.sum.sqrt;
+				if(q.dvm,{					
+					q.num.do({arg i;
+						q.num.do({arg j;
+							if(i!=j,{
+								distance_to_monitors[i,j]=(player_positions_rotated.rowAt(i)-monitor_position[i,j]).squared.sum.sqrt;
+							});
 						});
 					});
-				});
 
-				q.num.do({arg i;
-					if(i!=q.player_num,{
-						distance[i]=distance_to_monitors[i,q.player_num]+distance_to_monitors[q.player_num,i];	
-						volume[i]=distance[i].linlin(q.min_dist,q.max_dist,max_volume[i].ampdb,base[i].ampdb, \minmax).dbamp;
-					});
+					q.num.do({arg i;
+						if(i!=q.player_num,{
+							distance[i]=distance_to_monitors[i,q.player_num]+distance_to_monitors[q.player_num,i];	
+							volume[i]=distance[i].linlin(q.min_dist,q.max_dist,max_volume[i].ampdb,base[i].ampdb, \minmax).dbamp;
+						});
+					});					
+				
 				});
+			
 
-				distance.postln;
-				if(angles[q.player_num]<0,{
-					if(angles[q.player_num]<angle_thresh,{
-						adjusted_angle=2*(angles[q.player_num]+angle_thresh);
-					});
-				},{
-					if(angles[q.player_num]>angle_thresh,{
-						adjusted_angle=2*(angles[q.player_num]-angle_thresh);
-					});
-				});
-						
-				if(angles[q.player_num].abs>angle_thresh,{
-					q.esp_active=true;
-				},{
-					q.esp_active=false;
-				});
-
-				if(q.esp_active,{
-					right_to_left[0]=sin(adjusted_angle);
-					right_to_left[1]=(-1)*cos(adjusted_angle);
+				if(q.rms,{
+					right_to_left[0]=(-1)*cos(rms_angle);
+					right_to_left[1]=sin(rms_angle);
 					q.num.do({arg i;
 						var unit_vector=[0,0];
 						var dot_product;
-						var temp1, temp2;
-						var weight_right, weight_left;
 						if(i==q.player_num,{
-							esp_right[i]=volume[i];
-							esp_left[i]=volume[i];
+							volume_right[i]=volume[i];
+							volume_left[i]=volume[i];
 						},{
-							unit_vector[0]=(player_positions_rotated[i,0]-player_positions_rotated[q.player_num,0])/distance[i];
-							unit_vector[1]=(player_positions_rotated[i,1]-player_positions_rotated[q.player_num,1])/distance[i];
+							unit_vector[0]=(player_positions_viewer[q.player_num,0]-player_positions_viewer[i,0])/(player_positions_viewer.rowAt(q.player_num)-player_positions_viewer.rowAt(i)).squared.sum.sqrt;
+							unit_vector[1]=(player_positions_viewer[q.player_num,1]-player_positions_viewer[i,1])/(player_positions_viewer.rowAt(q.player_num)-player_positions_viewer.rowAt(i)).squared.sum.sqrt;
 							dot_product = (unit_vector[0]*right_to_left[0])+(unit_vector[1]*right_to_left[1]);
-							esp_right[i]=(volume[i]/2)*((1+dot_product).pow(2));
-							esp_left[i]=(volume[i]/2)*((1-dot_product).pow(2));
+							volume_right[i]=(volume[i]/2)*((1+dot_product).pow(2));
+							volume_left[i]=(volume[i]/2)*((1-dot_product).pow(2));
 						});
+					});
+
+				},{
+					q.num.do({arg i;
+						volume_right[i]=volume[i];
+						volume_left[i]=volume[i];
 					});
 				});
 			
-				if(q.esp_active,{
-					q.player_out_right.set(\amp, esp_right);
-					q.player_out_left.set(\amp, esp_left);
-					//[esp_left[1],esp_right[1]].postln;
-				},{					
-					q.player_out_right.set(\amp, volume);
-					q.player_out_left.set(\amp, volume);
+				if(q.esp,{
+					if(esp_angle.abs>esp_angle_thresh,{
+						q.esp_active=true;
+						if(esp_angle<0,{
+							esp_adjusted_angle=(-1)*(esp_angle+esp_angle_thresh);
+						},{
+							esp_adjusted_angle=(-1)*(esp_angle-esp_angle_thresh);
+						});
+							
+					},{
+						q.esp_active=false;
+						esp_adjusted_angle=0;
+					});
+
+					if(q.esp_active,{
+						q.num.do({arg i;
+							var temp;
+							if(i!=q.player_num,{
+								temp = player_positions_viewer[i,0]-player_positions_viewer[q.player_num,0];
+								if(i==1,{
+									temp.postln;
+								});
+								if(esp_adjusted_angle>0,{
+								//head is tilted to the right	
+									if(temp<0,{
+										//that musician is on the left. Tune down their volume in both ears.
+										volume_left[i] = esp_adjusted_angle.linlin(0,pi/4,volume_left[i],0);
+										volume_right[i] = esp_adjusted_angle.linlin(0,pi/4,volume_right[i],0);
+									},{
+										//that musician is to the right. Turn up the volume on the right side.
+										volume_left[i] = esp_adjusted_angle.linlin(0,pi/4,volume_left[i],0);
+										volume_right[i] = esp_adjusted_angle.linlin(0,pi/4,volume_right[i],(2*volume_right[i]));
+									});
+								},{
+								//head is tilted to the left
+									if(temp<0,{
+										//that musician is to the left. Turn up the volume on the left side
+										"turning up left player's volume".postln;
+										volume_left[i] = esp_adjusted_angle.linlin(-pi/4,0,2*volume_left[i],volume_left[i]);
+										volume_right[i] = esp_adjusted_angle.linlin(-pi/4,0,0,volume_right[i]);
+									},{
+										//that musician is to the right. Turn down their volume in both ears.
+										volume_left[i] = esp_adjusted_angle.linlin(-pi/4,0,0,volume_left[i]);
+										volume_right[i] = esp_adjusted_angle.linlin(-pi/4,0,0,volume_right[i]);
+									});
+								});
+							});
+						});
+	
+					},{
+						pan_pos=0;
+					});
+				},{
+					pan_pos=0;		
 				});
-			});
+
+				[volume_left[1], volume_right[1]].postln;
+				q.player_out_right.set(\amp, volume_right);
+				q.player_out_left.set(\amp, volume_left);			
 			
-			q.updateGUI(player_positions_rotated_for_GUI, volume, base, max_volume, loudness_range,head_roll, body_yaw);
+			});
+
+			q.updateGUI(player_positions_viewer, volume, base, max_volume, loudness_range,head_roll, body_yaw);
 
 		});
 								
@@ -1435,8 +1543,7 @@ q.startjam = { |q|
 };
 
 
-
-q.updateGUI = { |q, player_positions, volume, base, max_volume, loudness_range, head_roll, body_yaw|
+q.updateGUI = { |q, player_positions_viewer, volume, base, max_volume, loudness_range, head_roll, body_yaw|
 
 
 	var color_array;
@@ -1456,15 +1563,7 @@ q.updateGUI = { |q, player_positions, volume, base, max_volume, loudness_range, 
 	var body_yaw_rotated=Array.newClear(q.num);
 	var head_roll_adjusted=Array.newClear(q.num);
 	var head_offset, label_offset_x, label_offset_y;
-	var label_positions=Array2D.new(q.num,2);
-	var player_positions_rotated = Array2D.new(q.num,2);
-	var player_positions_rotated_perspective = Array2D.new(q.num,2);
-	var player_positions_adjusted_kinect_location = Array2D.new(q.num,2);
-	var player_positions_translated = Array2D.new(q.num,2);
-	var player_positions_scaled = Array2D.new(q.num,2);
-	var player_positions_translated_viewer = Array2D.new(q.num,2);
-	var player_positions_viewer=Array2D.new(q.num,2);
-	
+	var label_positions=Array2D.new(q.num,2);	
 	
 	
 	//this is how much we need to move the labels by to make them appear in the viewer
@@ -1481,39 +1580,15 @@ q.updateGUI = { |q, player_positions, volume, base, max_volume, loudness_range, 
 
 	q.num.do({arg i;
 		
-		player_positions_rotated[i,0]=(q.rotation_matrix[i][0,0]*player_positions[i,0])+(q.rotation_matrix[i][0,1]*player_positions[i,1]);
-		player_positions_rotated[i,1]=(q.rotation_matrix[i][1,0]*player_positions[i,0])+(q.rotation_matrix[i][1,1]*player_positions[i,1]); 
-
-
-		//we need to make the adjustments based on the current player's perspective
-		player_positions_rotated_perspective[i,0]=(q.rotation_matrix[q.player_num][0,0]*player_positions[i,0])+(q.rotation_matrix[q.player_num][0,1]*player_positions[i,1]);
-		player_positions_rotated_perspective[i,1]=(q.rotation_matrix[q.player_num][1,0]*player_positions[i,0])+(q.rotation_matrix[q.player_num][1,1]*player_positions[i,1]); 
-
-			
-
-		//positions have already been rotated and are in the appropriate quadrant
-		//we still need to translate, then scale them so that they can be seen by our viewer
-		player_positions_translated_viewer[i,0]=player_positions_rotated_perspective[i,0]-q.min_x;
-		player_positions_translated_viewer[i,1]=player_positions_rotated_perspective[i,1]-q.min_y;
-		
-		player_positions_scaled[i,0] = player_positions_translated_viewer[i,0]*q.pos_viewer_ratio_x;
-		player_positions_scaled[i,1] = player_positions_translated_viewer[i,1]*q.pos_viewer_ratio_y; 
-		player_positions_viewer[i,0] = player_positions_scaled[i,0]+q.avatar_margin;
-		player_positions_viewer[i,1] = q.viewer_total_height-player_positions_scaled[i,1]-q.avatar_margin;
 
 		body_yaw_adjusted[i]=body_yaw[i];
 		head_roll_adjusted[i]=head_roll[i]*(-1);
 
+		
+		head_offset=head_roll_adjusted[i].linlin(-pi/4,pi/4, (-1)*q.shoulder_length, q.shoulder_length, \minmax).floor;
 
-		
-		
-		/*("received:"+player_positions).postln;
-		("scaled:"+player_positions_scaled).postln;
-		("viewer:"+player_positions_viewer).postln;*/
-		
 
 		if(q.esp,{	
-			head_offset=head_roll_adjusted[i].linlin(-pi/4,pi/4, -1*q.shoulder_length, q.shoulder_length, \minmax).floor;
 			head_position[i,0]=player_positions_viewer[i,0]+head_offset;
 		},{
 			head_position[i,0]=player_positions_viewer[i,0];
@@ -1558,8 +1633,6 @@ q.updateGUI = { |q, player_positions, volume, base, max_volume, loudness_range, 
 			body_yaw_rotated[i]=body_yaw_reflected[i]+q.body_yaw_rot_angles[i];
 		});
 
-		//vertex_2.postln;
-		//player_positions_viewer.postln;
 
 		c.drawFunc = { 	
 			//Pen.translate(shoulder_width,shoulder_width);
@@ -1605,9 +1678,6 @@ q.updateGUI = { |q, player_positions, volume, base, max_volume, loudness_range, 
 
 
 
-
-
-
 q.stopjam = { |q|
 
 	q.volume_slider.enabled = false;
@@ -1621,12 +1691,9 @@ q.stopjam = { |q|
 	q.started = false;
 
 
-	if(q.esp, {
-		q.player_out_right.free;
-		q.player_out_left.free;
-	},{
-		q.player_out.free;
-	});
+	q.player_out_right.free;
+	q.player_out_left.free;
+	Server.all.do(_.freeAll);
 	
 	"jmess -D".unixCmd;
 	"killall osceleton_for_NMP".unixCmd;
@@ -1634,9 +1701,6 @@ q.stopjam = { |q|
 	//now we remove all osc nodes
 	q.info_osc.remove;
 	q.volume_osc.remove;
-	if(q.esp,{
-		q.orientation_node.remove;
-	});
 
 };
 
