@@ -47,6 +47,7 @@ q.createGUI_start = { |q|
 	q.dvm=true;
 	q.esp=true;
 	q.rms=true;
+	q.save=true; //for now we turn saving on
 	q.num=3;
 	q.cond_string="";
 
@@ -434,33 +435,34 @@ q.createGUI_main = { |q|
 	range_label.string = "Sensitivity of Dynamic Volume Mixing";
 
 	 
-	x_pos = (40*q.x_ratio).asInteger;
-	y_pos = (725*q.y_ratio).asInteger;
-	x_size = left_margin-(2*(40*q.x_ratio));
-	y_size = (80*q.y_ratio).asInteger;
+	x_pos = (45*q.x_ratio).asInteger;
+	y_pos = (765*q.y_ratio).asInteger;
+	x_size = left_margin-(2*(50*q.x_ratio));
+	y_size = (30*q.y_ratio).asInteger;
 	q.range_slider = Slider(w, Rect(x_pos, y_pos, x_size, y_size));
 	q.range_slider.enabled=false;
 
-	x_pos = (17*q.x_ratio).asInteger;
-	y_pos = (785*q.y_ratio).asInteger;
-	x_size = (100*q.x_ratio).asInteger;
-	y_size = (15*q.y_ratio).asInteger;
-	font_size = (15*q.min_effective_ratio).asInteger;
+	x_pos = (15*q.x_ratio).asInteger;
+	y_pos = (765*q.y_ratio).asInteger;
+	x_size = (30*q.x_ratio).asInteger;
+	y_size = (30*q.y_ratio).asInteger;
+	font_size = (30*q.min_effective_ratio).asInteger;
 	min_label = StaticText(w, Rect(x_pos, y_pos, x_size, y_size));
 	min_label.align=\left;
 	min_label.font = Font("Calibri", font_size, bold:true);		
-	min_label.string = "30dB";
+	min_label.string = "-";
 		
 	
-	x_pos = left_margin-(40*q.x_ratio).asInteger-((75-17)*q.x_ratio).asInteger;
-	y_pos = (785*q.y_ratio).asInteger;
-	x_size = (100*q.x_ratio).asInteger;
-	y_size = (15*q.y_ratio).asInteger;
-	font_size = (15*q.min_effective_ratio).asInteger;
+	//x_pos = left_margin-(40*q.x_ratio).asInteger-((75-17)*q.x_ratio).asInteger;
+	x_pos = left_margin-(45*q.x_ratio).asInteger;
+	y_pos = (765*q.y_ratio).asInteger;
+	x_size = (30*q.x_ratio).asInteger;
+	y_size = (30*q.y_ratio).asInteger;
+	font_size = (30*q.min_effective_ratio).asInteger;
 	max_label = StaticText(w, Rect(x_pos, y_pos, x_size, y_size));
-	max_label.align=\center;
+	max_label.align=\right;
 	max_label.font = Font("Calibri", font_size, bold:true);		
-	max_label.string = "100dB";		
+	max_label.string = "+";		
 
 
 
@@ -1049,7 +1051,7 @@ q.kinect_calibration_part_2 = { |q, x_array, y_array|
 
 q.startjam = { |q|
 	
-	var file_names=Array.newClear(4);
+	var file_names=Array.newClear(3);
 	var in_channels=Array.newClear(q.num);
 	var out_channels=[1,0]; //note that right is 1, left is 0.
 
@@ -1111,6 +1113,19 @@ q.startjam = { |q|
 	q.current_time=0;	
 	q.esp_active=false;
 
+	if(q.save,{
+		//we get the current time
+		q.start_time=thisThread.clock.beats*1000;
+
+		//we set up our files for saving
+		file_names[0]=catArgs(q.current_directory,"/data/Musician_",q.player_num,"_position_",Date.getDate,".txt");
+		file_names[1]=catArgs(q.current_directory,"/data/Musician_",q.player_num,"_orientation_",Date.getDate,".txt");
+		file_names[2]=catArgs(q.current_directory,"/data/Musician_",q.player_num,"_settings_",Date.getDate,".txt");	
+
+		q.file_position=File(file_names[0].asString,"w");
+		q.file_orientation=File(file_names[1].asString,"w");
+		q.file_settings=File(file_names[2].asString,"w");
+	});
 
 	q.num.do({arg i;
 		q.num.do({arg j;
@@ -1132,6 +1147,7 @@ q.startjam = { |q|
 	if(q.base_local==nil,{
 		q.base_local=0;
 	});
+
 
 
 	//initialize our arrays
@@ -1247,6 +1263,10 @@ q.startjam = { |q|
 		max_volume[q.player_num] = base[q.player_num] + loudness_range;
 		q.player_out_right.set(\amp, base);
 		q.player_out_left.set(\amp, base);
+		if(q.save,{
+			q.current_time=thisThread.clock.beats*1000-q.start_time;		
+			q.file_settings.putString(scatArgs("volume", q.current_time.asString, base[q.player_num].asString,"\n"));
+		});
 		//we should also send this new volume to the other musicians
 		q.num.do({arg i;
 			if(i!=q.player_num,{
@@ -1285,7 +1305,7 @@ q.startjam = { |q|
 
 	//we also want to receive the volume from the other musicians
 	q.volume_osc = OSCresponderNode(nil, '/vol_base', {arg time, resp, msg;
-		//our messages are formatted as [/vol, player_id, volume]
+		//our messages are formatted as [/vol_base, player_id, volume]
 		msg.postln;		
 		q.num.do({arg i;
 			if(msg[1]==i,{
@@ -1308,6 +1328,12 @@ q.startjam = { |q|
 	//now we define actions for the slider
 	q.range_slider.action_({
 		loudness_range=((q.range_slider.value*70)+30).dbamp;
+		
+		if(q.save,{
+			q.current_time=thisThread.clock.beats*1000-q.start_time;		
+			q.file_settings.putString(scatArgs("range", q.current_time.asString, loudness_range.asString,"\n"));
+		});
+
 		q.num.do({arg i;
 			max_volume[i]=base[i]+loudness_range;
 		});
@@ -1418,6 +1444,13 @@ q.startjam = { |q|
 
 	
 			if(player_received==q.player_num,{
+				if(q.save,{
+					q.current_time=thisThread.clock.beats*1000-q.start_time;		
+					q.file_position.putString(scatArgs(q.current_time.asString, player_positions[q.player_num,0].asString, player_positions			[q.player_num,1].asString, "\n"));
+					q.file_orientation.putString(scatArgs(q.current_time.asString, head_roll.asString, head_yaw.asString, body_yaw.asString, "\n"));
+				});
+
+
 				//now we resend this message to both remote participants if we've received our own info			
 				q.num.do({arg i;
 					if(i!=q.player_num,{
@@ -1491,9 +1524,6 @@ q.startjam = { |q|
 							var temp;
 							if(i!=q.player_num,{
 								temp = player_positions_viewer[i,0]-player_positions_viewer[q.player_num,0];
-								if(i==1,{
-									temp.postln;
-								});
 								if(esp_adjusted_angle>0,{
 								//head is tilted to the right	
 									if(temp<0,{
@@ -1509,7 +1539,6 @@ q.startjam = { |q|
 								//head is tilted to the left
 									if(temp<0,{
 										//that musician is to the left. Turn up the volume on the left side
-										"turning up left player's volume".postln;
 										volume_left[i] = esp_adjusted_angle.linlin(-pi/4,0,2*volume_left[i],volume_left[i]);
 										volume_right[i] = esp_adjusted_angle.linlin(-pi/4,0,0,volume_right[i]);
 									},{
@@ -1528,7 +1557,6 @@ q.startjam = { |q|
 					pan_pos=0;		
 				});
 
-				[volume_left[1], volume_right[1]].postln;
 				q.player_out_right.set(\amp, volume_right);
 				q.player_out_left.set(\amp, volume_left);			
 			
@@ -1689,6 +1717,13 @@ q.stopjam = { |q|
 	q.range_slider.enabled = false;
 
 	q.started = false;
+
+	if(q.save,{
+		q.file_position.close;
+		q.file_orientation.close;
+		q.file_settings.close;
+	});
+
 
 
 	q.player_out_right.free;
