@@ -47,7 +47,7 @@ q.createGUI_start = { |q|
 	q.dvm=true;
 	q.esp=true;
 	q.rms=true;
-	q.save=true; //for now we turn saving on
+	q.save=false; //you can turn this on to save data
 	q.num=3;
 	q.cond_string="";
 
