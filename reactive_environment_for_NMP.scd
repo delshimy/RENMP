@@ -45,9 +45,12 @@ q.createGUI_start = { |q|
 	q.x_total = Window.availableBounds.right;
 	q.y_total = Window.availableBounds.bottom;
 	q.dvm=true;
+	q.cond_dvm = "dvm_on";
 	q.esp=true;
+	q.cond_esp = "esp_on";
 	q.rms=true;
-	q.save=false; //you can turn this on to save data
+	q.cond_rms = "rms_on";
+	q.save=true; //for now we turn saving on
 	q.num=3;
 	q.cond_string="";
 
@@ -220,8 +223,10 @@ q.createGUI_start = { |q|
 	dvm_box.action = {arg value;
 		if (value == 1,{
 			q.dvm = true;
+			q.cond_dvm = "dvm_on";
 		},{
 			q.dvm = false;
+			q.cond_dvm = "dvm_off"
 		});	
 	};
 		
@@ -245,8 +250,10 @@ q.createGUI_start = { |q|
 	esp_box.action = {arg value;
 		if (value == 1,{
 			q.esp = true;
+			q.cond_esp = "esp_on";
 		},{
 			q.esp = false;
+			q.cond_esp = "esp_off";
 		});	
 	};
 
@@ -271,8 +278,10 @@ q.createGUI_start = { |q|
 	rms_box.action = {arg value;
 		if (value == 1,{
 			q.rms = true;
+			q.cond_rms = "rms_on";
 		},{
 			q.rms = false;
+			q.cond_rms = "rms_off";
 		});	
 	};
 
@@ -682,7 +691,7 @@ q.establish_connection = { |q|
 					if(connection_received==[0,1,0],{
 						q.connect_label.string="Musician "+q.player_order[1]+" is now connected.";
 					});	
-					if(connection_received==[0,1,1],{
+					if(connection_received==[1,1,0],{
 						q.connect_label.string="All musicians are now connected.";
 					});
 			
@@ -1057,7 +1066,7 @@ q.startjam = { |q|
 
 	//we define all variables related to volume changes
 	var base = Array.newClear(q.num);
-	var loudness_range = 30.dbamp; //each local musician sets a loudness range that only they experience
+	var loudness_range = 40.dbamp; //each local musician sets a loudness range that only they experience
 	var max_volume = Array.newClear(q.num); //each musician has a maximum volume that is a function of their current volume + loudness range
 	var volume = Array.newClear(q.num);
 
@@ -1118,9 +1127,9 @@ q.startjam = { |q|
 		q.start_time=thisThread.clock.beats*1000;
 
 		//we set up our files for saving
-		file_names[0]=catArgs(q.current_directory,"/data/Musician_",q.player_num,"_position_",Date.getDate,".txt");
-		file_names[1]=catArgs(q.current_directory,"/data/Musician_",q.player_num,"_orientation_",Date.getDate,".txt");
-		file_names[2]=catArgs(q.current_directory,"/data/Musician_",q.player_num,"_settings_",Date.getDate,".txt");	
+		file_names[0]=catArgs(q.current_directory,"/data/position/Musician_",q.player_num,"_", q.cond_dvm,"_",q.cond_esp,"_", q.cond_rms, "_position_", Date.getDate, ".txt");
+		file_names[1]=catArgs(q.current_directory,"/data/orientation/Musician_",q.player_num,"_", q.cond_dvm,"_", q.cond_esp,"_", q.cond_rms, "_orientation_", Date.getDate, ".txt");
+		file_names[2]=catArgs(q.current_directory,"/data/settings/Musician_",q.player_num, "_", q.cond_dvm,"_", q.cond_esp,"_", q.cond_rms, "_settings_", Date.getDate, ".txt");	
 
 		q.file_position=File(file_names[0].asString,"w");
 		q.file_orientation=File(file_names[1].asString,"w");
@@ -1133,15 +1142,16 @@ q.startjam = { |q|
 		});
 	});		
 
-	//in 434, left monitor leads to 436, right monitor leads to 435
-	monitor_position[0,1]=q.kinect_corners_rotated[0,1]; //left monitor
-	monitor_position[0,2]=q.kinect_corners_rotated[0,0]; //right monitor
-	//in 435, left monitor leads to 434, right monitor leads to 434
-	monitor_position[1,0]=q.kinect_corners_rotated[1,3]; //right monitor
-	monitor_position[1,2]=q.kinect_corners_rotated[1,0]; //left monitor
-	//in 436, left monitor leads to 435, right monitor leads to 434
-	monitor_position[2,0]=q.kinect_corners_rotated[2,0]; //right monitor
-	monitor_position[2,1]=q.kinect_corners_rotated[2,3]; //left monitor
+	//for player 0, left is player 1, right is player 2
+	monitor_position[0,1]=q.kinect_corners_rotated[0,3]; //left monitor
+	monitor_position[0,2]=q.kinect_corners_rotated[0,2]; //right monitor
+	//for player 1, left is player 2, right is player 0
+	monitor_position[1,2]=q.kinect_corners_rotated[1,3]; //left monitor
+	monitor_position[1,0]=q.kinect_corners_rotated[1,2]; //right monitor
+	//for player 2, left is player 0, right is player 1
+	monitor_position[2,0]=q.kinect_corners_rotated[2,3]; //left monitor
+	monitor_position[2,1]=q.kinect_corners_rotated[2,2]; //right monitor
+
 
 
 	if(q.base_local==nil,{
@@ -1310,6 +1320,7 @@ q.startjam = { |q|
 		q.num.do({arg i;
 			if(msg[1]==i,{
 				base[i]=msg[2];
+				volume[i]=base[i];
 				max_volume[i]=base[i]+loudness_range;
 			});
 		});	
@@ -1347,15 +1358,25 @@ q.startjam = { |q|
 	//Note that we receive the messages for all three players
 	q.info_osc = OSCresponderNode(nil, '/client', {arg time, resp, msg;			
 		var player_received;
-
+		
 		if (msg[2]==(-1),{
 			//this means it is coming from the local computer	
 			player_received=q.player_num;
+			//now we resend this message to both remote participants if we've received our own info			
+			q.num.do({arg i;
+				if(i!=q.player_num,{
+					q.osc_addresses_57120[i].sendMsg("/client", msg[1], q.player_num, msg[3],msg[4],msg[5],msg[6],msg[7],msg[8]);
+					q.osc_addresses_57121[i].sendMsg("/client", msg[1], q.player_num, msg[3],msg[4],msg[5],msg[6],msg[7],msg[8]);			
+				});
+			
+			});
+
 		},{
 			player_received=msg[2];
-		});		
 
-			
+		});		
+		
+	
 		if(msg[1].asString=="head",{
 			filter_head_yaw[player_received, counter%filter_size]=msg[7]*pi/180;
 			filter_head_roll[player_received, counter%filter_size]=msg[8]*pi/180;		
@@ -1442,22 +1463,13 @@ q.startjam = { |q|
 			player_positions_viewer[player_received,0] = player_positions_scaled[player_received,0]+q.avatar_margin;
 			player_positions_viewer[player_received,1] = q.viewer_total_height-player_positions_scaled[player_received,1]-q.avatar_margin;
 
-	
 			if(player_received==q.player_num,{
 				if(q.save,{
 					q.current_time=thisThread.clock.beats*1000-q.start_time;		
-					q.file_position.putString(scatArgs(q.current_time.asString, player_positions[q.player_num,0].asString, player_positions			[q.player_num,1].asString, "\n"));
-					q.file_orientation.putString(scatArgs(q.current_time.asString, head_roll.asString, head_yaw.asString, body_yaw.asString, "\n"));
+					q.file_position.putString(scatArgs(q.current_time.asString, player_positions[q.player_num,0].asString, player_positions			[q.player_num,1].asString, player_positions_rotated[q.player_num,0].asString, player_positions_rotated[q.player_num,1].asString, "\n"));
+					q.file_orientation.putString(scatArgs(q.current_time.asString, head_roll[q.player_num].asString, head_yaw[q.player_num].asString, body_yaw[q.player_num].asString, "\n"));
 				});
 
-
-				//now we resend this message to both remote participants if we've received our own info			
-				q.num.do({arg i;
-					if(i!=q.player_num,{
-						q.osc_addresses_57120[i].sendMsg("/client",q.player_num+1,msg[2],msg[3],msg[4],msg[5],msg[6],msg[7]);
-						q.osc_addresses_57121[i].sendMsg("/client",q.player_num+1,msg[2],msg[3],msg[4],msg[5],msg[6],msg[7]);			
-					});
-				});
 
 
 				//now we need to calculate the distances to each monitor
@@ -1465,10 +1477,13 @@ q.startjam = { |q|
 					q.num.do({arg i;
 						q.num.do({arg j;
 							if(i!=j,{
-								distance_to_monitors[i,j]=(player_positions_rotated.rowAt(i)-monitor_position[i,j]).squared.sum.sqrt;
+								distance_to_monitors[i,j]=(player_positions_rotated_perspective.rowAt(i)-monitor_position[i,j]).squared.sum.sqrt;
 							});
 						});
 					});
+					
+	
+
 
 					q.num.do({arg i;
 						if(i!=q.player_num,{
@@ -1478,7 +1493,6 @@ q.startjam = { |q|
 					});					
 				
 				});
-			
 
 				if(q.rms,{
 					right_to_left[0]=(-1)*cos(rms_angle);
@@ -1561,14 +1575,15 @@ q.startjam = { |q|
 				q.player_out_left.set(\amp, volume_left);			
 			
 			});
-
+			
 			q.updateGUI(player_positions_viewer, volume, base, max_volume, loudness_range,head_roll, body_yaw);
-
+			
 		});
 								
 	}).add;
 				
 };
+
 
 
 q.updateGUI = { |q, player_positions_viewer, volume, base, max_volume, loudness_range, head_roll, body_yaw|
@@ -1593,7 +1608,6 @@ q.updateGUI = { |q, player_positions_viewer, volume, base, max_volume, loudness_
 	var head_offset, label_offset_x, label_offset_y;
 	var label_positions=Array2D.new(q.num,2);	
 	
-	
 	//this is how much we need to move the labels by to make them appear in the viewer
 	label_offset_x=q.x_available-q.viewer_total_width-25-(q.head_radius/2);
 	label_offset_y=q.head_radius/2;	
@@ -1612,7 +1626,6 @@ q.updateGUI = { |q, player_positions_viewer, volume, base, max_volume, loudness_
 		body_yaw_adjusted[i]=body_yaw[i];
 		head_roll_adjusted[i]=head_roll[i]*(-1);
 
-		
 		head_offset=head_roll_adjusted[i].linlin(-pi/4,pi/4, (-1)*q.shoulder_length, q.shoulder_length, \minmax).floor;
 
 
@@ -1655,12 +1668,15 @@ q.updateGUI = { |q, player_positions_viewer, volume, base, max_volume, loudness_
 
 		if(i==q.player_num,{
 			body_yaw_reflected[i]=(body_yaw_adjusted[i]+pi);
+		},{
+			body_yaw_reflected[i]=body_yaw_adjusted[i];
 		});
-
+		
 		q.num.do({arg i;
 			body_yaw_rotated[i]=body_yaw_reflected[i]+q.body_yaw_rot_angles[i];
 		});
 
+	
 
 		c.drawFunc = { 	
 			//Pen.translate(shoulder_width,shoulder_width);
@@ -1695,14 +1711,18 @@ q.updateGUI = { |q, player_positions_viewer, volume, base, max_volume, loudness_
 			});
 
 		};
-		label_positions[i,0]=player_positions_viewer[i,0]+(head_offset*cos(body_yaw_rotated[i]))+label_offset_x;
-		label_positions[i,1]=player_positions_viewer[i,1]+(head_offset*sin(body_yaw_rotated[i]))+label_offset_y;
-		q.player_labels[i].bounds=Rect(label_positions[i,0], label_positions[i,1],q.head_radius,q.head_radius);	
-					
-			
+		if(q.esp,{
+			label_positions[i,0]=player_positions_viewer[i,0]+(head_offset*cos(body_yaw_rotated[i]))+label_offset_x;
+			label_positions[i,1]=player_positions_viewer[i,1]+(head_offset*sin(body_yaw_rotated[i]))+label_offset_y;
+		},{
+			label_positions[i,0]=player_positions_viewer[i,0]+label_offset_x;
+			label_positions[i,1]=player_positions_viewer[i,1]+label_offset_y;
+		});			
+		q.player_labels[i].bounds=Rect(label_positions[i,0], label_positions[i,1],q.head_radius,q.head_radius);		
 	});
 
 };
+
 
 
 
