@@ -21,7 +21,7 @@
 q.startjam = { |q|
 	
 	var file_names=Array.newClear(3);
-	var out_channels=[2,0]; //note that structure is [left, right]
+	var out_channels=[0,1]; //note that structure is [left, right]
 
 	//we define all variables related to volume changes
 	var base_volume_instrument = Array.newClear(q.num);
@@ -604,7 +604,7 @@ q.startjam = { |q|
 	}).value=(q.reverb_range/max_reverb_range);
 	
 	//we want to define our features
-	catArgs(q.current_directory,"/src/track_isolation.scd").load;
+	catArgs(q.current_directory,"/src/track_panning.scd").load;
 	catArgs(q.current_directory,"/src/mix_control.scd").load;
 	catArgs(q.current_directory,"/src/musician_spatialization.scd").load;
 

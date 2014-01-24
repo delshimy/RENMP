@@ -45,7 +45,7 @@ q.createGUI_start = { |q|
 	q.dr=false;
 	q.cond_dr = "dr_off";
 	q.tp=false;
-	q.cond_ti = "tp_off";
+	q.cond_tp = "tp_off";
 	q.mc=false;
 	q.cond_mc = "mc_off";
 	q.ms=false;
@@ -274,14 +274,14 @@ q.createGUI_start = { |q|
 	tp_box.action = {
 		if (tp_box.value,{
 			q.tp = true;
-			q.cond_ti = "tp_on";
+			q.cond_tp = "tp_on";
 			q.ms=false;
 			q.cond_ms= "ms_off";
 			ms_box.value=false;
 			
 		},{
 			q.tp = false;
-			q.cond_ti = "tp_off";
+			q.cond_tp = "tp_off";
 		});	
 	};
 
@@ -336,7 +336,7 @@ q.createGUI_start = { |q|
 			q.ms = true;
 			q.cond_ms = "ms_on";
 			q.tp=false;
-			q.cond_ti= "tp_off";
+			q.cond_tp= "tp_off";
 			tp_box.value=false;
 				
 		},{

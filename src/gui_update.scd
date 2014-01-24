@@ -34,6 +34,7 @@ q.updateGUI = { |q, player_positions_viewer, distance, distance_to_monitors, hea
 	var arc_num_volume=Array.newClear(q.num);
 	var arc_num_reverb=Array.newClear(q.num);
 	var arc_max=10;
+	var arc_mid=3;
 	var angles = Array.newClear(q.num);
 	var head_position =Array2D.new(q.num,2);
 	var body_yaw_reflected=Array.newClear(q.num);
@@ -80,20 +81,22 @@ q.updateGUI = { |q, player_positions_viewer, distance, distance_to_monitors, hea
 		},{
 			if(q.dv,{
 				var temp1, temp2;
-				temp1=distance_to_monitors[i,q.player_num].linlin(0,q.max_dist/2, 3.ampdb, 1.ampdb,\minmax).dbamp.floor;
+				temp1=distance_to_monitors[i,q.player_num].linlin(0,q.max_dist/2, arc_mid.ampdb, 1.ampdb,\minmax).dbamp.floor;
 
 				if(distance_to_monitors[q.player_num,i]<(q.volume_threshold_near*q.max_dist/2),{
-					temp2=7;
+					temp2=arc_max-arc_mid;
 				});
 
 				if((distance_to_monitors[q.player_num,i]>(q.volume_threshold_near*q.max_dist/2))&&(distance_to_monitors[q.player_num,i]<(q.volume_threshold_far*q.max_dist/2)),{
-					temp2=distance[i].linlin(distance_to_monitors[i,q.player_num]+(q.volume_threshold_near*q.max_dist/2), distance_to_monitors[i,q.player_num]+(q.volume_threshold_far*q.max_dist/2),7.ampdb, 1.ampdb).dbamp.floor;
+					temp2=distance[i].linlin(distance_to_monitors[i,q.player_num]+(q.volume_threshold_near*q.max_dist/2), distance_to_monitors[i,q.player_num]+(q.volume_threshold_far*q.max_dist/2),(arc_max-arc_mid).ampdb, 1.ampdb).dbamp.floor;
 				});
 
 				if(distance_to_monitors[q.player_num,i]>(q.volume_threshold_far*q.max_dist/2),{
 					temp2=0;
 				});
 				arc_num_volume[i] = temp1+temp2;
+
+
 			});			
 		
 			if(q.dr,{
@@ -152,14 +155,28 @@ q.updateGUI = { |q, player_positions_viewer, distance, distance_to_monitors, hea
 				Pen.width=3;
 				
 
-				Pen.color=Color.white;
+				Pen.color=Color.black;
 				arc_num_reverb[i].do({arg j;
 					Pen.addArc(head_position[i,0]@(head_position[i,1]+(2*q.head_radius)+(10*(arc_num_reverb[i]+1))), q.head_radius+(10*(j+1)), -pi/3, (-pi/3) );
 					Pen.perform(\stroke);
 				});
 
-				Pen.color=Color.black;
 				arc_num_volume[i].do({arg j;
+
+
+					if((j<(arc_max/3).floor)&&(j>=0),{
+						Pen.color=Color.green(1.0,1.0);
+					});
+					if((j<(2*arc_max/3).floor)&&(j>=(arc_max/3).floor),{
+						Pen.color=Color.yellow(1.0, 1.0);
+					});
+					if(j>=(2*arc_max/3).floor,{
+						Pen.color=Color.red(1.0, 1.0);
+					});
+
+
+
+
 					Pen.addArc(head_position[i,0]@head_position[i,1], q.head_radius+(10*(j+1)),pi/3, pi/3 );
 					Pen.perform(\stroke);
 				});

@@ -99,18 +99,18 @@ q.createGUI_feature_control = { |q|
 	tp_box.action = {
 		if (tp_box.value,{
 			q.tp = true;
-			q.cond_ti = "tp_on";
+			q.cond_tp = "tp_on";
 			q.ms=false;
 			q.cond_ms= "ms_off";
 			ms_box.value=false;
 		},{
 			q.tp = false;
-			q.cond_ti = "tp_off";
+			q.cond_tp = "tp_off";
 		});
 
 		if(q.save,{
 			q.current_time=thisThread.clock.beats*1000-q.start_time;		
-			q.file_settings.putString(scatArgs("feature_change",q.current_time.asString, q.cond_ti.asString,"\n"));
+			q.file_settings.putString(scatArgs("feature_change",q.current_time.asString, q.cond_tp.asString,"\n"));
 		});	
 	};
 
@@ -165,7 +165,7 @@ q.createGUI_feature_control = { |q|
 			q.ms = true;
 			q.cond_ms = "ms_on";
 			q.tp=false;
-			q.cond_ti= "tp_off";
+			q.cond_tp= "tp_off";
 			tp_box.value=false;
 	
 	
