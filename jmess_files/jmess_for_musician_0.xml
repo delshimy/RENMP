@@ -1,51 +1,51 @@
 <jmess>
   <connection>
-    <output>firewire_pcm:0040ab0000c24ec1_MicIn1 left_in</output>
+    <output>system:capture_1</output>
     <input>JackTrip-01:send_1</input>
   </connection>
   <connection>
-    <output>firewire_pcm:0040ab0000c24ec1_MicIn1 left_in</output>
+    <output>system:capture_1</output>
     <input>SuperCollider:in_1</input>
   </connection>
   <connection>
-    <output>firewire_pcm:0040ab0000c24ec1_MicIn1 left_in</output>
+    <output>system:capture_1</output>
     <input>JackTrip:send_1</input>
   </connection>
   <connection>
-    <output>firewire_pcm:0040ab0000c24ec1_MicIn1 right_in</output>
-    <input>firewire_pcm:0040ab0000c24ec1_LineOut 1+2 right_out</input>
+    <output>system:capture_2</output>
+    <input>system:playback_2</input>
   </connection>
   <connection>
-    <output>firewire_pcm:0040ab0000c24ec1_MicIn1 right_in</output>
-    <input>firewire_pcm:0040ab0000c24ec1_LineOut 1+2 left_out</input>
+    <output>system:capture_2</output>
+    <input>system:playback_1</input>
   </connection>
   <connection>
-    <output>firewire_pcm:0040ab0000c24ec1_MicIn1 right_in</output>
+    <output>system:capture_2</output>
     <input>JackTrip-01:send_2</input>
   </connection>
   <connection>
-    <output>firewire_pcm:0040ab0000c24ec1_MicIn1 right_in</output>
+    <output>system:capture_2</output>
     <input>JackTrip:send_2</input>
   </connection>
   <connection>
-    <output>firewire_pcm:0040ab0000c24ec1_MicIn1 right_in</output>
+    <output>system:capture_2</output>
     <input>ardour:Audio 3/in 1</input>
   </connection>
   <connection>
     <output>ardour:master/out 1</output>
-    <input>firewire_pcm:0040ab0000c24ec1_LineOut 1+2 left_out</input>
+    <input>system:playback_1</input>
   </connection>
   <connection>
     <output>ardour:master/out 2</output>
-    <input>firewire_pcm:0040ab0000c24ec1_LineOut 1+2 right_out</input>
+    <input>system:playback_2</input>
   </connection>
   <connection>
     <output>ardour:auditioner/out 1</output>
-    <input>firewire_pcm:0040ab0000c24ec1_LineOut 1+2 left_out</input>
+    <input>system:playback_1</input>
   </connection>
   <connection>
     <output>ardour:auditioner/out 2</output>
-    <input>firewire_pcm:0040ab0000c24ec1_LineOut 1+2 right_out</input>
+    <input>system:playback_2</input>
   </connection>
   <connection>
     <output>ardour:Audio 1/out 1</output>
@@ -65,15 +65,15 @@
   </connection>
   <connection>
     <output>ardour:click/out 1</output>
-    <input>firewire_pcm:0040ab0000c24ec1_LineOut 1+2 left_out</input>
+    <input>system:playback_1</input>
   </connection>
   <connection>
     <output>ardour:click/out 2</output>
-    <input>firewire_pcm:0040ab0000c24ec1_LineOut 1+2 right_out</input>
+    <input>system:playback_2</input>
   </connection>
   <connection>
     <output>SuperCollider:out_1</output>
-    <input>firewire_pcm:0040ab0000c24ec1_LineOut 1+2 left_out</input>
+    <input>system:playback_1</input>
   </connection>
   <connection>
     <output>SuperCollider:out_1</output>
@@ -81,7 +81,7 @@
   </connection>
   <connection>
     <output>SuperCollider:out_2</output>
-    <input>firewire_pcm:0040ab0000c24ec1_LineOut 1+2 right_out</input>
+    <input>system:playback_2</input>
   </connection>
   <connection>
     <output>SuperCollider:out_2</output>
@@ -93,11 +93,11 @@
   </connection>
   <connection>
     <output>musician_1:receive_2</output>
-    <input>firewire_pcm:0040ab0000c24ec1_LineOut 1+2 left_out</input>
+    <input>system:playback_1</input>
   </connection>
   <connection>
     <output>musician_1:receive_2</output>
-    <input>firewire_pcm:0040ab0000c24ec1_LineOut 1+2 right_out</input>
+    <input>system:playback_2</input>
   </connection>
   <connection>
     <output>musician_2:receive_1</output>
@@ -105,10 +105,10 @@
   </connection>
   <connection>
     <output>musician_2:receive_2</output>
-    <input>firewire_pcm:0040ab0000c24ec1_LineOut 1+2 right_out</input>
+    <input>system:playback_2</input>
   </connection>
   <connection>
     <output>musician_2:receive_2</output>
-    <input>firewire_pcm:0040ab0000c24ec1_LineOut 1+2 left_out</input>
+    <input>system:playback_1</input>
   </connection>
 </jmess>
