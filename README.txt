@@ -1,12 +1,12 @@
-Reactive Environment for NMP
+Reactive Environment for Network Musical Performance (RENMP)
 ===============================
 
-Thank you for downloading our Reactive Environment for NMP!
+Thank you for downloading our Reactive Environment for Network Musical Performance!
 
 What is it?
 -------------
 
-The Reactive Environment for NMP is an open-source, distributed performance software that allows musicians in different locations to perform with one another, dynamically alter each other's volumes and experience special stereo panning effects.
+The Reactive Environment for Network Musical Performance is an open-source, distributed performance software that allows musicians in different locations to perform with one another, dynamically alter each other's volumes and reverb, control their mix settings, and experience stereo panning effects.
 
 Which platforms can I use this on?
 ----------------------------------
